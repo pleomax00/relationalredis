@@ -29,8 +29,10 @@ class RField ():
     This class defined a field in Redis Database, similar to a column in a Relational DB.
     """
 
-    required = False                    # If this field is mandatory.
-    default = None                      # The default value of this field, if not provided.
+	# If this field is mandatory.
+    required = False                    
+	# The default value of this field, if not provided.
+    default = None                      
 
     def __init__ (self, *k, **kw):
         if kw.has_key ("required"):
@@ -249,7 +251,8 @@ if __name__ == "__main__":
 
     # Again, lets define a User.
     class User (RModel):
-        username = StringField (required = True)                # A Field that can store a String.
+		# A Field that can store a String.
+        username = StringField (required = True)                
         first_name = StringField (required = True)
         last_name = StringField ()
         password = StringField (required = True)
@@ -257,26 +260,38 @@ if __name__ == "__main__":
 
     # Lets now define a Table which will act as foreign key for another table.
     class FK (RModel):
-        name = StringField ()                                   # Can store a String.
+		# Can store a String.
+        name = StringField ()                                   
 
     # Lets now define another Table Test that will have a property for ForeignKey
     class Test (RModel):
         username = StringField ()
-        password = StringField ()                               # Stores a String
-        rel = ForeignKey ('FK')                                 # Refers to another Table called 'FK'.
-        defa = StringField (default = 'a')                      # Stores a String with some default value.
-        req = StringField (required = True, default = 'abc')    # Stores a String with some validation.
+		# Stores a String
+        password = StringField ()                               
+		# Refers to another Table called 'FK'.
+        rel = ForeignKey ('FK')                                 
+		# Stores a String with some default value.
+        defa = StringField (default = 'a')                      
+		# Stores a String with some validation.
+        req = StringField (required = True, default = 'abc')    
 
+    # Creates an object of FK
     fk = FK (name = 'abc')
-    fk.save ()                                                  # Creates an object of FK
+    fk.save ()                                                  
 
-    print "FKID:", fk.id                                        # See if the object is creates?
+    # See if the object is creates?
+    print "FKID:", fk.id                                        
 
-    t = Test (username = "u", password = "p")                   # Lets now create an object for Test
-    t.rel = fk                                                  # Put the previous object as its relation reference.
-    t.save ()                                                   # Save it.
+    # Lets now create an object for Test
+    t = Test (username = "u", password = "p")                   
+    # Put the previous object as its relation reference.
+    t.rel = fk                                                  
+    # Save it.
+    t.save ()                                                   
     print t.id
-    k= t.rel                                                    # See what we get back is the object itself!!
+
+    # See what we get back is the object itself!!
+    k= t.rel                                                    
     print "Name:", k.name
 
     #t.username = "new"
@@ -284,6 +299,8 @@ if __name__ == "__main__":
 
     #t = Test ()
     #t.username = 22
-    for i in r.keys ():                                         # Lets see what keys were saved in the DB.
+
+    # Lets see what keys were saved in the DB.
+    for i in r.keys ():                                         
        print i, r.get (i)
 
