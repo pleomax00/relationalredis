@@ -1,4 +1,12 @@
 #! /usr/bin/env python
+
+# ----------------------------------------------------------------
+# @author: Shamail Tayyab
+# @date: Thu Apr 4 12:33:00 IST 2013
+#
+# @desc: Redis/Python ORM for storing relational data in redis.
+# ----------------------------------------------------------------
+
 import inspect
 import redis
 
@@ -6,6 +14,10 @@ r = redis.Redis ()
 r.flushall ()
 
 class classproperty(object):
+    """ 
+    Lets support for making a property on a class.
+    """
+
     def __init__(self, getter):
         self._getter = getter
 
@@ -13,28 +25,47 @@ class classproperty(object):
         return self._getter(owner)
 
 class RField ():
-    required = False
-    default = None
+    """ 
+    This class defined a field in Redis Database, similar to a column in a Relational DB.
+    """
+
+    required = False                    # If this field is mandatory.
+    default = None                      # The default value of this field, if not provided.
 
     def __init__ (self, *k, **kw):
         if kw.has_key ("required"):
             self.required = kw['required']
         if kw.has_key ("default"):
             self.default = kw['default']
-        
 
 class StringField (RField):
+    """ 
+    @inherit RField
+    Implementation of String Field, where user wants to store a String in the Database.
+    """
     pass
 
 class IntField (RField):
+    """ 
+    @inherit RField
+    Implementation of Integer Field, where user wants to store a Integer in the Database.
+    """
     pass
 
 class ForeignKey (RField):
+    """ 
+    @inherit RField
+    Implementation of Foreign Key, where user wants to store One to One relation in the Database.
+    """
+
     def __init__ (self, *k, **kw):
         RField.__init__ (self, *k, **kw)
         self.relation = k[0]
 
 class RModel (object):
+    """
+    The actual Redis based model class implementation.
+    """
     
     id = IntField ()
 
@@ -42,6 +73,9 @@ class RModel (object):
     locals = []
 
     def __init__ (self, *k, **kw):
+        """ 
+        Stores the provided values.
+        """
         self.newobj = True
         self.keyvals = {}
         self.locals = []
@@ -58,17 +92,26 @@ class RModel (object):
                         raise Exception ("Need a default value for %s" % (i))
 
     def from_id (self, id):
+        """ 
+        Loads a model from its ID.
+        """
         self.seq = int(id)
         self.newobj = False
         return self
         
     def reinit (self):
+        """
+        Reloads the properties of this class from Database.
+        """
         #for name, obj in inspect.getmembers (self):
         ##    if isinstance (obj, RField):
         #        self.keyvals[name] = obj.default
         inspect.getmembers (self)
 
     def validate (self):
+        """ 
+        Validations for a Field.
+        """
         if kw.has_key (name):
             self.keyvals[name] = kw[name]
         elif obj.default is not None:
@@ -79,18 +122,30 @@ class RModel (object):
 
     @property
     def classkey (self):
+        """ 
+        Generates the Key for this class.
+        """
         return 'rmodel:%s' % (self.__class__.__name__.lower ())
 
     def sequence (self):
+        """ 
+        Sequence Generator, uses Redis's atomic operation.
+        """
         seq_av_at = "%s:__seq__" % (self.classkey)
         seq = r.incr (seq_av_at)
         return seq
 
     def prepare_key (self, key, for_seq):
+        """ 
+        Prepares a key to be stored for this class.
+        """
         r_key = "%s:%d:%s" % (self.classkey, for_seq, key)
         return r_key
 
     def save (self):
+        """ 
+        Persist this object into the Redis Database.
+        """
         if self.newobj:
             using_sequence = self.sequence ()
             self.keyvals['id'] = using_sequence
@@ -105,9 +160,15 @@ class RModel (object):
 
     @classproperty
     def objects (self):
+        """ 
+        Supports UserClass.objects.all () like stuff.
+        """
         return InternalObjectList (self)
 
     def __getattribute__ (self, attr):
+        """ 
+        Getter for this class.
+        """
         attrib = object.__getattribute__(self, attr)
         if not isinstance (attrib, RField):
             return attrib
@@ -133,6 +194,9 @@ class RModel (object):
         return answer
         
     def __setattr__ (self, attr, val):
+        """ 
+        Setter for this class.
+        """
         try:
             attrib = object.__getattribute__(self, attr)
         except AttributeError:
@@ -151,11 +215,17 @@ class RModel (object):
 
 
 class InternalObjectList (object):
+    """ 
+    The query object, to support UserClass.objects.get () or UserClass.object.get_by_id () etc.
+    """
     
     def __init__ (self, classfor):
         self.classfor = classfor
 
     def get_by_id (self, id):
+        """ 
+        Returns an object by its ID.
+        """
         clsfor_obj = self.classfor()
         clsfor_obj.from_id (id)
         return clsfor_obj
@@ -165,51 +235,55 @@ class InternalObjectList (object):
                 key = clsfor_obj.prepare_key (name, int(id))
 
     def get (self, *k, **kw):
+        """ 
+        Returns an object by one of its property, say name.
+        """
         if kw.has_key ('id'):
             return self.get_by_id (kw['id'])
 
-class Profile (RModel):
-    fbid = StringField ()
+if __name__ == "__main__":
 
-class User (RModel):
-    username = StringField (required = True)
-    first_name = StringField (required = True)
-    last_name = StringField ()
-    password = StringField (required = True)
-    email = StringField (required = True)
+    # Lets define a Profile Class which is a Redis Based Model (inherits RModel).
+    class Profile (RModel):
+        fbid = StringField ()
 
+    # Again, lets define a User.
+    class User (RModel):
+        username = StringField (required = True)                # A Field that can store a String.
+        first_name = StringField (required = True)
+        last_name = StringField ()
+        password = StringField (required = True)
+        email = StringField (required = True)
 
+    # Lets now define a Table which will act as foreign key for another table.
+    class FK (RModel):
+        name = StringField ()                                   # Can store a String.
 
-"""
-class FK (RModel):
-    name = StringField ()
+    # Lets now define another Table Test that will have a property for ForeignKey
+    class Test (RModel):
+        username = StringField ()
+        password = StringField ()                               # Stores a String
+        rel = ForeignKey ('FK')                                 # Refers to another Table called 'FK'.
+        defa = StringField (default = 'a')                      # Stores a String with some default value.
+        req = StringField (required = True, default = 'abc')    # Stores a String with some validation.
 
-class Test (RModel):
-    username = StringField ()
-    password = StringField ()
-    rel = ForeignKey ('FK')
-    defa = StringField (default = 'a')
-    req = StringField (required = True, default = 'abc')
+    fk = FK (name = 'abc')
+    fk.save ()                                                  # Creates an object of FK
 
+    print "FKID:", fk.id                                        # See if the object is creates?
 
-fk = FK (name = 'abc')
-fk.save ()
+    t = Test (username = "u", password = "p")                   # Lets now create an object for Test
+    t.rel = fk                                                  # Put the previous object as its relation reference.
+    t.save ()                                                   # Save it.
+    print t.id
+    k= t.rel                                                    # See what we get back is the object itself!!
+    print "Name:", k.name
 
-print "FKID:", fk.id
+    #t.username = "new"
+    #t.save ()
 
-t = Test (username = "u", password = "p")
-t.rel = fk
-t.save ()
-print t.id
-k= t.rel
-print "Naaam:", k.name
+    #t = Test ()
+    #t.username = 22
+    for i in r.keys ():                                         # Lets see what keys were saved in the DB.
+       print i, r.get (i)
 
-
-#t.username = "new"
-#t.save ()
-
-#t = Test ()
-#t.username = 22
-for i in r.keys ():
-   print i, r.get (i)
-"""
